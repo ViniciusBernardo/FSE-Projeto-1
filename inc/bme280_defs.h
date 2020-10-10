@@ -431,6 +431,16 @@ struct bme280_settings
     uint8_t standby_time;
 };
 
+/* Structure that contains identifier details used in example */
+struct identifier
+{
+    /* Variable to hold device address */
+    uint8_t dev_addr;
+
+    /* Variable that contains file descriptor */
+    int8_t fd;
+};
+
 /*!
  * @brief bme280 device structure
  */
