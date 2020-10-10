@@ -27,10 +27,14 @@ class SensorBME280 {
     void parse_temperature_calib_data(const uint8_t *reg_data);
     int8_t get_calib_data();
     double compensate_temperature(const struct bme280_uncomp_data *uncomp_data);
+    int8_t set_sensor_mode(uint8_t sensor_mode);
+    int8_t write_power_mode(uint8_t sensor_mode);
     int8_t read_data(uint8_t register_address, uint8_t *data, uint32_t length);
     int8_t write_data(uint8_t register_address, const uint8_t *data, uint32_t length);
     int8_t set_register_data(uint8_t *register_address, const uint8_t *register_data, uint8_t length);
     int8_t soft_reset();
+    int8_t put_device_to_sleep();
+    int8_t reload_device_settings(const struct bme280_settings *settings);
     void interleave_reg_addr(const uint8_t *register_address, uint8_t *temp_buff, const uint8_t *register_data, uint8_t length);
     void delay_us(uint32_t period);
 

@@ -65,6 +65,8 @@ double SensorBME280::get_temperature(){
     int8_t rslt;
     double temperature;
 
+    set_sensor_mode(BME280_FORCED_MODE);
+
     /* Array to store the pressure, temperature and humidity data read from
      * the sensor
      */
@@ -121,6 +123,56 @@ double SensorBME280::compensate_temperature(const struct bme280_uncomp_data *unc
     }
 
     return temperature;
+}
+
+
+int8_t SensorBME280::set_sensor_mode(uint8_t sensor_mode){
+    int8_t rslt = BME280_OK;
+    uint8_t last_set_mode;
+
+    rslt = get_register_data(BME280_PWR_CTRL_ADDR, &last_set_mode, 1);
+
+    /* Assign the power mode in the device structure */
+    last_set_mode = BME280_GET_BITS_POS_0(last_set_mode, BME280_SENSOR_MODE);
+
+    /* If the sensor is not in sleep mode put the device to sleep
+     * mode
+     */
+    if ((rslt == BME280_OK) && (last_set_mode != BME280_SLEEP_MODE)){
+        rslt = put_device_to_sleep();
+    }
+
+    /* Set the power mode */
+    if (rslt == BME280_OK){
+        rslt = write_power_mode(sensor_mode);
+    }
+
+    return rslt;
+}
+
+
+/*!
+ * @brief This internal API writes the power mode in the sensor.
+ */
+int8_t SensorBME280::write_power_mode(uint8_t sensor_mode){
+    int8_t rslt;
+    uint8_t reg_addr = BME280_PWR_CTRL_ADDR;
+
+    /* Variable to store the value read from power mode register */
+    uint8_t sensor_mode_reg_val;
+
+    /* Read the power mode register */
+    rslt = get_register_data(reg_addr, &sensor_mode_reg_val, 1);
+
+    /* Set the power mode */
+    if (rslt == BME280_OK){
+        sensor_mode_reg_val = BME280_SET_BITS_POS_0(sensor_mode_reg_val, BME280_SENSOR_MODE, sensor_mode);
+
+        /* Write the power mode in the register */
+        rslt = set_register_data(&reg_addr, &sensor_mode_reg_val, 1);
+    }
+
+    return rslt;
 }
 
 /*!
@@ -274,6 +326,67 @@ int8_t SensorBME280::soft_reset(){
     }
 
     return result;
+}
+
+
+/*!
+ * @brief This internal API puts the device to sleep mode.
+ */
+int8_t SensorBME280::put_device_to_sleep(){
+    int8_t rslt;
+    uint8_t reg_data[4];
+    struct bme280_settings settings;
+
+    rslt = get_register_data(BME280_CTRL_HUM_ADDR, reg_data, 4);
+
+    if (rslt == BME280_OK){
+        settings.osr_h = BME280_GET_BITS_POS_0(reg_data[0], BME280_CTRL_HUM);
+        settings.osr_p = BME280_GET_BITS(reg_data[2], BME280_CTRL_PRESS);
+        settings.osr_t = BME280_GET_BITS(reg_data[2], BME280_CTRL_TEMP);
+        settings.filter = BME280_GET_BITS(reg_data[3], BME280_FILTER);
+        settings.standby_time = BME280_GET_BITS(reg_data[3], BME280_STANDBY);
+
+        rslt = soft_reset();
+
+        if (rslt == BME280_OK){
+            rslt = reload_device_settings(&settings);
+            *reg_data = BME280_SET_BITS(*reg_data, BME280_CTRL_PRESS, settings->osr_p);
+        }
+    }
+
+    return rslt;
+}
+
+/*!
+ * @brief This internal API reloads the already existing device settings in
+ * the sensor after soft reset.
+ */
+int8_t SensorBME280::reload_device_settings(const struct bme280_settings *settings){
+    int8_t rslt;
+    uint8_t reg_addr = BME280_CTRL_MEAS_ADDR;
+    uint8_t reg_data;
+
+    rslt = get_register_data(reg_addr, &reg_data, 1);
+
+    if (rslt == BME280_OK){
+        reg_data = BME280_SET_BITS(reg_data, BME280_CTRL_TEMP, settings->osr_t);
+
+        /* Write the oversampling settings in the register */
+        rslt = set_register_data(&reg_addr, &reg_data, 1);
+    }
+
+    reg_addr = BME280_CONFIG_ADDR;
+    rslt = get_register_data(reg_addr, &reg_data, 1);
+
+    if (rslt == BME280_OK){
+        reg_data = BME280_SET_BITS(reg_data, BME280_FILTER, settings->filter);
+        reg_data = BME280_SET_BITS(reg_data, BME280_STANDBY, settings->standby_time);
+
+        /* Write the oversampling settings in the register */
+        rslt = set_register_data(&reg_addr, &reg_data, 1);
+    }
+
+    return rslt;
 }
 
 /*!
