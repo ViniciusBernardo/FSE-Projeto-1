@@ -6,6 +6,7 @@
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
+#include <time.h>
 
 int main(int argc, char ** argv){
     uint8_t device_address = BME280_I2C_ADDR_PRIM;
@@ -21,6 +22,9 @@ int main(int argc, char ** argv){
         exit(1);
     }
     SensorBME280 *sensor_temperatura_externa = new SensorBME280(device_address, file_descriptor);
-    printf("Temperatura Externa: %.2lf °C\n", sensor_temperatura_externa->get_temperature());
+    while(1){
+        printf("Temperatura Externa: %.2lf °C\n", sensor_temperatura_externa->get_temperature());
+	sleep(1);
+    }
     return 0;
 }

@@ -1,4 +1,5 @@
 #include "sensor_bme280.hpp"
+#include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <cstdlib>
@@ -104,6 +105,8 @@ double SensorBME280::compensate_temperature(const struct bme280_uncomp_data *unc
     double temperature_min = -40;
     double temperature_max = 85;
 
+    printf("dig_t1: %lf\n", this->calibration_data.dig_t1);
+
     var1 = ((double)uncomp_data->temperature) / 16384.0 - ((double)this->calibration_data.dig_t1) / 1024.0;
     var1 = var1 * ((double)this->calibration_data.dig_t2);
     var2 = (((double)uncomp_data->temperature) / 131072.0 - ((double)this->calibration_data.dig_t1) / 8192.0);
@@ -152,7 +155,7 @@ int8_t SensorBME280::write_data(uint8_t register_address, const uint8_t *data, u
  * @brief This API reads the data from the given register address of the sensor.
  */
 int8_t SensorBME280::get_register_data(uint8_t register_address, uint8_t *register_data, uint16_t length){
-    int8_t result;
+    int8_t result = BME280_OK;
 
     /* Read the data  */
     this->interface_result = read_data(register_address, register_data, length);
@@ -170,7 +173,7 @@ int8_t SensorBME280::get_register_data(uint8_t register_address, uint8_t *regist
  * of the sensor.
  */
 int8_t SensorBME280::set_register_data(uint8_t *register_address, const uint8_t *register_data, uint8_t length){
-    int8_t result;
+    int8_t result = BME280_OK;
     uint8_t temp_buff[20]; /* Typically not to write more than 10 registers */
 
     if (length > 10){
