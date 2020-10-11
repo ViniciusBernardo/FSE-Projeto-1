@@ -1,5 +1,5 @@
 #include "sensor_bme280/sensor_bme280.c"
-#include "lcd_16x2/i2c_lcd.c"
+#include "lcd_16x2/lcd_display.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -14,7 +14,7 @@ int main(int argc, char ** argv){
         char line_1[16];
         sprintf(line_1, "TE: %.2f", external_temperature); 
         
-        writeOnLCD(line_1, "");
+        showLines(line_1, "");
     }
     return 0;
 }
