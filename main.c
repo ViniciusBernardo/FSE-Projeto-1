@@ -10,6 +10,13 @@ int main(int argc, char ** argv){
     float external_temperature;
     float reference_temperature;
     float internal_temperature;
+
+    if (wiringPiSetup () == -1) exit (1);
+
+    fd = wiringPiI2CSetup(I2C_ADDR);
+
+    lcd_init(); // setup LCD
+
     while(1){
         external_temperature = get_external_temperature("/dev/i2c-1");
         reference_temperature = get_temperature("TR");
@@ -20,8 +27,8 @@ int main(int argc, char ** argv){
 
         char line_1[16];
         char line_2[16];
-        sprintf(line_1, "TR: %.2f TE: %.1f", reference_temperature, external_temperature);
-        sprintf(line_2, "TI: %.2f", internal_temperature);
+        sprintf(line_1, "TI: %.2f TE: %.1f", internal_temperature, external_temperature);
+        sprintf(line_2, "TR: %.2f", reference_temperature);
         
         showLines(line_1, line_2);
     }

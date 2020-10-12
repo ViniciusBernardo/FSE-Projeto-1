@@ -10,7 +10,7 @@ float get_temperature(const char *temperature_name) { // temperature_name = TI |
 
     uart0_filestream = open("/dev/serial0", O_RDWR | O_NOCTTY | O_NDELAY);
     if(uart0_filestream == -1) {
-        prinf("Erro - Porta serial não pode ser aberta. Confirme se não está sendo usada por outra aplicação.\n");
+        printf("Erro - Porta serial não pode ser aberta. Confirme se não está sendo usada por outra aplicação.\n");
         return temperature;
     }
 
@@ -66,8 +66,7 @@ float get_temperature(const char *temperature_name) { // temperature_name = TI |
 		} else {
 			//Bytes received
 			rx_buffer[rx_length] = '\0';
-            temperature = (float)rx_buffer;
-			printf("%i bytes read : %.2f\n", rx_length, temperature);
+            temperature = (*(float*)rx_buffer);
 		}
 	}
 
