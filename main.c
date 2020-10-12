@@ -1,12 +1,14 @@
 #include "sensor_bme280/sensor_bme280.c"
 #include "lcd_16x2/lcd_display.c"
 #include "uart/uart.c"
+#include "gpio/control.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 
 int main(int argc, char ** argv){
+    int histerese = 4;
     float external_temperature;
     float reference_temperature;
     float internal_temperature;
@@ -16,6 +18,13 @@ int main(int argc, char ** argv){
     fd = wiringPiI2CSetup(I2C_ADDR);
 
     lcd_init(); // setup LCD
+
+    if (!bcm2835_init())
+      return 1;
+
+    // Set the pin to be an output
+    bcm2835_gpio_fsel(PIN_COOLER, BCM2835_GPIO_FSEL_OUTP);
+    bcm2835_gpio_fsel(PIN_RESISTOR, BCM2835_GPIO_FSEL_OUTP);
 
     while(1){
         external_temperature = get_external_temperature("/dev/i2c-1");
@@ -31,6 +40,10 @@ int main(int argc, char ** argv){
         sprintf(line_2, "TR: %.2f", reference_temperature);
         
         showLines(line_1, line_2);
+
+        control(histerese, internal_temperature, reference_temperature);
     }
+
+    bcm2835_close();
     return 0;
 }
