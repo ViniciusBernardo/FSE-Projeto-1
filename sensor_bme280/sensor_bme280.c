@@ -49,6 +49,14 @@ struct identifier
     int8_t fd;
 };
 
+/* Structure that contains sensor_bme280 struct and the external temperature */
+struct external_measurement
+{
+    struct bme280_dev * sensor_bme280;
+
+    float TE;
+};
+
 /****************************************************************************/
 /*!                         Functions                                       */
 
