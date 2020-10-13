@@ -25,7 +25,7 @@ int main(int argc, char ** argv){
     lcd_init(); // setup LCD
 
     if (!bcm2835_init())
-    return 1;
+        return 1;
 
     // Set the pin to be an output
     bcm2835_gpio_fsel(PIN_COOLER, BCM2835_GPIO_FSEL_OUTP);
@@ -38,19 +38,19 @@ int main(int argc, char ** argv){
     execute = 1;
     while(execute){
         internal_temperature = get_temperature("TI");
-	reference_temperature = get_temperature("TR");
+        reference_temperature = get_temperature("TR");
         external_temperature = get_external_temperature(sensor_bme280);
-	printf("\n");
+        printf("\n");
         printf("Temperatura Externa: %.2f °C\n", external_temperature);
         printf("Temperatura De Referência: %.2f °C\n", reference_temperature);
         printf("Temperatura Interna: %.2f °C\n", internal_temperature);
-	printf("\n");
+        printf("\n");
 
         char *line_1 = malloc(16*sizeof(char));
         char *line_2 = malloc(16*sizeof(char));
         sprintf(line_1, "TI: %.2f TE: %.1f", internal_temperature, external_temperature);
         sprintf(line_2, "TR: %.2f", reference_temperature);
-        
+
         showLines(line_1, line_2);
 
         control(histerese, internal_temperature, reference_temperature);

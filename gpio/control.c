@@ -11,13 +11,13 @@ void control(int histerese, float TI, float TR) {
 
     if(TI < lower_limit) {
         bcm2835_gpio_write(PIN_RESISTOR, LOW);
-	bcm2835_delay(500);
+        bcm2835_delay(500);
         bcm2835_gpio_write(PIN_COOLER, HIGH);
-	bcm2835_delay(500);
+        bcm2835_delay(500);
     } else if (TI > upper_limit) {
         bcm2835_gpio_write(PIN_RESISTOR, HIGH);
-	bcm2835_delay(500);
+        bcm2835_delay(500);
         bcm2835_gpio_write(PIN_COOLER, LOW);
-	bcm2835_delay(500);
+        bcm2835_delay(500);
     }
 }
