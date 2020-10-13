@@ -97,25 +97,27 @@ int8_t user_i2c_read(uint8_t reg_addr, uint8_t *data, uint32_t len, void *intf_p
  */
 int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *data, uint32_t len, void *intf_ptr);
 
-float get_external_temperature(const char path_ic2_bus[]);
+float get_external_temperature(struct bme280_dev * device);
 
-float get_external_temperature(const char path_ic2_bus[]){
+struct bme280_dev * create_sensor(const char path_ic2_bus[]);
+
+struct bme280_dev * create_sensor(const char path_ic2_bus[]){
     struct bme280_dev * device = (struct bme280_dev*)malloc(sizeof(struct bme280_dev));
 
-    struct identifier id;
+    struct identifier * id = (struct identifier*)malloc(sizeof(struct identifier));
 
     /* Variable to define the result */
     int8_t rslt = BME280_OK;
 
-    if ((id.fd = open(path_ic2_bus, O_RDWR)) < 0){
+    if ((id->fd = open(path_ic2_bus, O_RDWR)) < 0){
         fprintf(stderr, "Failed to open the i2c bus %s\n", path_ic2_bus);
         exit(1);
     }
 
     /* Make sure to select BME280_I2C_ADDR_PRIM or BME280_I2C_ADDR_SEC as needed */
-    id.dev_addr = BME280_I2C_ADDR_PRIM;
+    id->dev_addr = BME280_I2C_ADDR_PRIM;
 
-    if (ioctl(id.fd, I2C_SLAVE, id.dev_addr) < 0){
+    if (ioctl(id->fd, I2C_SLAVE, id->dev_addr) < 0){
         fprintf(stderr, "Failed to acquire bus access and/or talk to slave.\n");
         exit(1);
     }
@@ -126,7 +128,7 @@ float get_external_temperature(const char path_ic2_bus[]){
     device->delay_us = user_delay_us;
 
     /* Update interface pointer with the structure that contains both device address and file descriptor */
-    device->intf_ptr = &id;
+    device->intf_ptr = id;
 
     /* Initialize the bme280 */
     rslt = bme280_init(device);
@@ -152,6 +154,14 @@ float get_external_temperature(const char path_ic2_bus[]){
         fprintf(stderr, "Failed to set sensor settings (code %+d).\n", rslt);
         exit(1);
     }
+
+    return device;
+}
+
+float get_external_temperature(struct bme280_dev * device){
+
+    /* Variable to define the result */
+    int8_t rslt = BME280_OK;
 
     /* Variable to store minimum wait time between consecutive measurement in force mode */
     uint32_t req_delay;

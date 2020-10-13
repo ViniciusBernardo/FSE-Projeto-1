@@ -14,8 +14,9 @@ void trap(int signal){ execute = 0; }
 int main(int argc, char ** argv){
     int histerese = 4;
     float external_temperature;
-    float reference_temperature = get_temperature("TR");
+    float reference_temperature;
     float internal_temperature;
+    struct bme280_dev * sensor_bme280 = create_sensor("/dev/i2c-1");
 
     if (wiringPiSetup () == -1) exit (1);
 
@@ -36,8 +37,9 @@ int main(int argc, char ** argv){
     signal(SIGINT, &trap);
     execute = 1;
     while(execute){
-        external_temperature = get_external_temperature("/dev/i2c-1");
         internal_temperature = get_temperature("TI");
+	reference_temperature = get_temperature("TR");
+        external_temperature = get_external_temperature(sensor_bme280);
 	printf("\n");
         printf("Temperatura Externa: %.2f °C\n", external_temperature);
         printf("Temperatura De Referência: %.2f °C\n", reference_temperature);
