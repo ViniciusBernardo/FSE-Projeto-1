@@ -17,9 +17,16 @@ void *measure_external_temperature(void *measurement){
     parameters->TE = get_external_temperature(parameters->sensor_bme280);
 }
 
+void *read_uart(void *TI_TR_structure){
+    struct uart_temperatures * uart_measurements = (struct uart_temperatures *)TI_TR_structure;
+    uart_measurements.TI = get_temperature("TI");
+    uart_measurements.TR = get_temperature("TR");
+}
+
 int main(int argc, char ** argv){
     int histerese = 4;
     struct external_measurement external_temperature;
+    struct uart_temperatures uart_measurements;
     //float internal_temperature;
     //float reference_temperature;
     //struct bme280_dev * sensor_bme280 = create_sensor("/dev/i2c-1");
@@ -34,7 +41,6 @@ int main(int argc, char ** argv){
 
     //if (!bcm2835_init())
     //    return 1;
-    //
 
     //// Set the pin to be an output
     //bcm2835_gpio_fsel(PIN_COOLER, BCM2835_GPIO_FSEL_OUTP);
@@ -47,15 +53,16 @@ int main(int argc, char ** argv){
     execute = 1;
     while(execute){
 
-    pthread_t thread_id;
-    pthread_create(&thread_id, NULL, measure_external_temperature, (void *)&external_temperature);
+        pthread_t thread_id[2];
+        pthread_create(&thread_id[0], NULL, measure_external_temperature, (void *)&external_temperature);
+        pthread_create(&thread_id[1], NULL, read_uart, (void *)&uart_measurements);
         //internal_temperature = get_temperature("TI");
         //reference_temperature = get_temperature("TR");
-        //printf("\n");
+        printf("\n");
         printf("Temperatura Externa: %.2f °C\n", external_temperature.TE);
-        //printf("Temperatura De Referência: %.2f °C\n", reference_temperature);
-        //printf("Temperatura Interna: %.2f °C\n", internal_temperature);
-        //printf("\n");
+        printf("Temperatura De Referência: %.2f °C\n", uart_measurements.TR);
+        printf("Temperatura Interna: %.2f °C\n", uart_measurements.TI);
+        printf("\n");
 
         //char *line_1 = malloc(16*sizeof(char));
         //char *line_2 = malloc(16*sizeof(char));
@@ -65,7 +72,7 @@ int main(int argc, char ** argv){
         //showLines(line_1, line_2);
 
         //control(histerese, internal_temperature, reference_temperature);
-	sleep(1);
+        sleep(1);
     }
 
     //bcm2835_gpio_write(PIN_COOLER, HIGH);
