@@ -2,6 +2,7 @@
 #include "lcd_16x2/lcd_display.c"
 #include "uart/uart.c"
 #include "gpio/control.c"
+#include "utils/csv_operations.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -22,14 +23,18 @@ pthread_mutex_t mutex_bme;
 pthread_mutex_t mutex_uart;
 pthread_mutex_t mutex_control;
 pthread_mutex_t mutex_show;
+pthread_mutex_t mutex_csv;
 pthread_cond_t condition_bme;
 pthread_cond_t condition_uart;
 pthread_cond_t condition_control;
 pthread_cond_t condition_show;
+pthread_cond_t condition_csv;
 unsigned int run_bme = 0;
 unsigned int run_uart = 0;
 unsigned int run_control = 0;
 unsigned int run_show = 0;
+unsigned int run_csv = 0;
+unsigned int n_executions = 0;
 int execute = 1;
 
 void *read_bme(void *measurement){
@@ -68,6 +73,18 @@ void *control_unit(void *measurement){
     return NULL;
 }
 
+void *write_csv_file(void *measurement){
+    pthread_mutex_lock(&mutex_csv);
+    while(!run_csv){
+        pthread_cond_wait(&condition_csv, &mutex_csv);
+        struct measurements * parameters = (struct measurements *)measurement;
+        write_to_csv(parameters->TE, parameters->TI, parameters->TR);
+        run_csv = 0;
+    }
+    pthread_mutex_unlock(&mutex_csv);
+    return NULL;
+}
+
 void *show_information(void *measurement){
     pthread_mutex_lock(&mutex_show); //mutex lock
     while(!run_show){
@@ -92,6 +109,7 @@ void *show_information(void *measurement){
 }
 
 void sig_handler(int signum){
+	n_executions++;
     // start bme
     pthread_mutex_lock(&mutex_bme);
     if(run_bme == 0){
@@ -123,6 +141,17 @@ void sig_handler(int signum){
         pthread_cond_signal(&condition_show);
     }
     pthread_mutex_unlock(&mutex_show);
+
+    if(n_executions == 4){
+	    n_executions = 0;
+    // start csv
+    pthread_mutex_lock(&mutex_csv);
+    if(run_csv == 0){
+        run_csv = 1;
+        pthread_cond_signal(&condition_csv);
+    }
+    pthread_mutex_unlock(&mutex_csv);
+    }
     ualarm(5e5, 5e5);
 }
 
@@ -131,6 +160,7 @@ execute = 0;
 };
 
 int main(int argc, char ** argv){
+	build_csv();
     temperatures.sensor_bme280 = create_sensor("/dev/i2c-1");
 
     if (wiringPiSetup () == -1) exit (1);
@@ -160,27 +190,32 @@ int main(int argc, char ** argv){
     pthread_mutex_init(&mutex_uart, NULL);
     pthread_mutex_init(&mutex_control, NULL);
     pthread_mutex_init(&mutex_show, NULL);
+    pthread_mutex_init(&mutex_csv, NULL);
     pthread_cond_init(&condition_bme, NULL);
     pthread_cond_init(&condition_uart, NULL);
     pthread_cond_init(&condition_control, NULL);
     pthread_cond_init(&condition_show, NULL);
+    pthread_cond_init(&condition_csv, NULL);
 
-    pthread_t thread_id[4];
+    pthread_t thread_id[5];
     pthread_create(&thread_id[0], NULL, read_bme, (void *)&temperatures);
     pthread_create(&thread_id[1], NULL, read_uart, (void *)&temperatures);
     pthread_create(&thread_id[2], NULL, control_unit, (void *)&temperatures);
     pthread_create(&thread_id[3], NULL, show_information, (void *)&temperatures);
+    pthread_create(&thread_id[4], NULL, write_csv_file, (void *)&temperatures);
 
     while(execute){sleep(1);}
 
     bcm2835_gpio_write(PIN_COOLER, HIGH);
     bcm2835_gpio_write(PIN_RESISTOR, HIGH);
     bcm2835_close();
+    fclose(csv_file);
 
     pthread_join(&thread_id[0], NULL);
     pthread_join(&thread_id[1], NULL);
     pthread_join(&thread_id[2], NULL);
     pthread_join(&thread_id[3], NULL);
+    pthread_join(&thread_id[4], NULL);
 
     pthread_exit(NULL);
     return 0;

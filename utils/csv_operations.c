@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <time.h>
 
-FILE * build_csv(){
-    FILE *csv_file;
+FILE *csv_file;
+
+void build_csv(){
     csv_file = fopen("./measurements.csv", "w+");
 
     if(csv_file == NULL){
@@ -11,12 +12,10 @@ FILE * build_csv(){
     }
 
     fprintf(csv_file, "%s,%s,%s,%s,%s\n", "Data", "Hora", "Temperatura Interna", "Temperatura Externa", "Temperatura de Referência");
-
-    return csv_file;
 }
 
 
-void write_to_csv(FILE *csv_file, float TE, float, TI, float TR) {
+void write_to_csv(float TE, float TI, float TR) {
     time_t now;
     time(&now);
     struct tm *local = localtime(&now);
