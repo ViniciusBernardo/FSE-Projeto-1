@@ -3,22 +3,13 @@
 #include "uart/uart.c"
 #include "gpio/control.c"
 #include "utils/csv_operations.c"
+#include "utils/menu.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 #include <signal.h>
 #include <pthread.h>
-
-struct measurements {
-    struct bme280_dev * sensor_bme280;
-    float TE;
-    float TI;
-    float TR;
-    int histerese;
-};
-
-struct measurements temperatures;
 
 pthread_mutex_t mutex_bme;
 pthread_mutex_t mutex_uart;
@@ -67,7 +58,7 @@ void *control_temperature(void *measurement){
     while(!run_control){
         pthread_cond_wait(&condition_control, &mutex_control);
         struct measurements * parameters = (struct measurements *)measurement;
-        control(2, parameters->TI, parameters->TR);
+        control(parameters->histerese, parameters->TI, parameters->TR);
         run_control = 0;
     }
     pthread_mutex_unlock(&mutex_control);
@@ -159,26 +150,13 @@ void exit_program(int signal){
 };
 
 int main(int argc, char ** argv){
-	build_csv();
+    struct measurements temperatures;
     temperatures.sensor_bme280 = create_sensor("/dev/i2c-1");
 
-    if (wiringPiSetup () == -1) exit (1);
-
-    fd = wiringPiI2CSetup(I2C_ADDR);
-
-    lcd_init(); // setup LCD
-    ClrLcd();
-
-    if (!bcm2835_init())
-        return 1;
-
-
-    // Set the pin to be an output
-    bcm2835_gpio_fsel(PIN_COOLER, BCM2835_GPIO_FSEL_OUTP);
-    bcm2835_gpio_fsel(PIN_RESISTOR, BCM2835_GPIO_FSEL_OUTP);
-
-    bcm2835_gpio_write(PIN_COOLER, LOW);
-    bcm2835_gpio_write(PIN_RESISTOR, HIGH);
+	build_csv();
+    initialize_lcd();
+    initialize_gpio();
+    initialize_menu(&temperatures);
 
     signal(SIGALRM, sig_handler);
     signal(SIGINT, &exit_program);
@@ -212,9 +190,7 @@ int main(int argc, char ** argv){
     run_csv = 1;
     n_executions = 1;
 
-    bcm2835_gpio_write(PIN_COOLER, HIGH);
-    bcm2835_gpio_write(PIN_RESISTOR, HIGH);
-    bcm2835_close();
+    close_gpio();
     fclose(csv_file);
 
     pthread_join(&thread_id[0], NULL);
