@@ -30,17 +30,17 @@ unsigned int run_bme = 0;
 unsigned int run_uart = 0;
 unsigned int run_control = 0;
 unsigned int run_show = 0;
+int execute = 1;
 
 void *read_bme(void *measurement){
     pthread_mutex_lock(&mutex_bme);
     while(!run_bme){
         pthread_cond_wait(&condition_bme, &mutex_bme);
         struct measurements * parameters = (struct measurements *)measurement;
-        parameters->TE = get_external_temperature(parameters->sensor_bme280);
+	parameters->TE = get_external_temperature(parameters->sensor_bme280);
         run_bme = 0;
     }
     pthread_mutex_unlock(&mutex_bme);
-    return NULL;
 }
 
 void *read_uart(void *measurement){
@@ -127,11 +127,7 @@ void sig_handler(int signum){
 }
 
 void exit_program(int signal){
-    bcm2835_gpio_write(PIN_COOLER, HIGH);
-    bcm2835_gpio_write(PIN_RESISTOR, HIGH);
-    bcm2835_close();
-
-    exit(0);
+execute = 0;
 };
 
 int main(int argc, char ** argv){
@@ -147,6 +143,7 @@ int main(int argc, char ** argv){
     if (!bcm2835_init())
         return 1;
 
+
     // Set the pin to be an output
     bcm2835_gpio_fsel(PIN_COOLER, BCM2835_GPIO_FSEL_OUTP);
     bcm2835_gpio_fsel(PIN_RESISTOR, BCM2835_GPIO_FSEL_OUTP);
@@ -159,11 +156,26 @@ int main(int argc, char ** argv){
 
     ualarm(5e5, 5e5);
 
+    pthread_mutex_init(&mutex_bme, NULL);
+    pthread_mutex_init(&mutex_uart, NULL);
+    pthread_mutex_init(&mutex_control, NULL);
+    pthread_mutex_init(&mutex_show, NULL);
+    pthread_cond_init(&condition_bme, NULL);
+    pthread_cond_init(&condition_uart, NULL);
+    pthread_cond_init(&condition_control, NULL);
+    pthread_cond_init(&condition_show, NULL);
+
     pthread_t thread_id[4];
     pthread_create(&thread_id[0], NULL, read_bme, (void *)&temperatures);
     pthread_create(&thread_id[1], NULL, read_uart, (void *)&temperatures);
     pthread_create(&thread_id[2], NULL, control_unit, (void *)&temperatures);
     pthread_create(&thread_id[3], NULL, show_information, (void *)&temperatures);
+
+    while(execute){sleep(1);}
+
+    bcm2835_gpio_write(PIN_COOLER, HIGH);
+    bcm2835_gpio_write(PIN_RESISTOR, HIGH);
+    bcm2835_close();
 
     pthread_join(&thread_id[0], NULL);
     pthread_join(&thread_id[1], NULL);
