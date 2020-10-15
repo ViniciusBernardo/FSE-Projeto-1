@@ -3,6 +3,10 @@
 #include <fcntl.h>
 #include <termios.h>
 
+struct uart_temperatures{
+    float TI;
+    float TR;
+};
 
 float get_temperature(const char *temperature_name) { // temperature_name = TI || TR
     int uart0_filestream = -1;
@@ -52,7 +56,7 @@ float get_temperature(const char *temperature_name) { // temperature_name = TI |
         }
     }
 
-    sleep(1);
+    usleep(9e4);
 
     //----- CHECK FOR ANY RX BYTES -----
     if (uart0_filestream != -1) {

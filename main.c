@@ -2,63 +2,227 @@
 #include "lcd_16x2/lcd_display.c"
 #include "uart/uart.c"
 #include "gpio/control.c"
+#include "utils/csv_operations.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 #include <signal.h>
+#include <pthread.h>
 
-int execute;
-void trap(int signal){ execute = 0; }
+struct measurements {
+    struct bme280_dev * sensor_bme280;
+    float TE;
+    float TI;
+    float TR;
+    int histerese;
+};
+
+struct measurements temperatures;
+
+pthread_mutex_t mutex_bme;
+pthread_mutex_t mutex_uart;
+pthread_mutex_t mutex_control;
+pthread_mutex_t mutex_show;
+pthread_mutex_t mutex_csv;
+pthread_cond_t condition_bme;
+pthread_cond_t condition_uart;
+pthread_cond_t condition_control;
+pthread_cond_t condition_show;
+pthread_cond_t condition_csv;
+unsigned int run_bme = 0;
+unsigned int run_uart = 0;
+unsigned int run_control = 0;
+unsigned int run_show = 0;
+unsigned int run_csv = 0;
+unsigned int n_executions = 0;
+int execute = 1;
+
+void *read_bme(void *measurement){
+    pthread_mutex_lock(&mutex_bme);
+    while(!run_bme){
+        pthread_cond_wait(&condition_bme, &mutex_bme);
+        struct measurements * parameters = (struct measurements *)measurement;
+        parameters->TE = get_external_temperature(parameters->sensor_bme280);
+        run_bme = 0;
+    }
+    pthread_mutex_unlock(&mutex_bme);
+}
+
+void *read_uart(void *measurement){
+    pthread_mutex_lock(&mutex_uart);
+    while(!run_uart){
+        pthread_cond_wait(&condition_uart, &mutex_uart);
+        struct measurements * parameters = (struct measurements *)measurement;
+        parameters->TI = get_temperature("TI");
+        parameters->TR = get_temperature("TR");
+        run_uart = 0;
+    }
+    pthread_mutex_unlock(&mutex_uart);
+    return NULL;
+}
+
+void *control_temperature(void *measurement){
+    pthread_mutex_lock(&mutex_control);
+    while(!run_control){
+        pthread_cond_wait(&condition_control, &mutex_control);
+        struct measurements * parameters = (struct measurements *)measurement;
+        control(2, parameters->TI, parameters->TR);
+        run_control = 0;
+    }
+    pthread_mutex_unlock(&mutex_control);
+    return NULL;
+}
+
+void *write_csv_file(void *measurement){
+    pthread_mutex_lock(&mutex_csv);
+    while(!run_csv){
+        pthread_cond_wait(&condition_csv, &mutex_csv);
+        struct measurements * parameters = (struct measurements *)measurement;
+        write_to_csv(parameters->TE, parameters->TI, parameters->TR);
+        run_csv = 0;
+    }
+    pthread_mutex_unlock(&mutex_csv);
+    return NULL;
+}
+
+void *show_information(void *measurement){
+    pthread_mutex_lock(&mutex_show); //mutex lock
+    while(!run_show){
+        pthread_cond_wait(&condition_show, &mutex_show); //wait for the condition
+
+        struct measurements * parameters = (struct measurements *)measurement;
+        printf("TE: %.2f°C, TI: %.2f°C, TR: %.2f°C\n", parameters->TE, parameters-TI, parameters->TR);
+        char *line_1 = malloc(16*sizeof(char));
+        char *line_2 = malloc(16*sizeof(char));
+        sprintf(line_1, "TI: %.2fTE:%.1f", parameters->TI, parameters->TE);
+        sprintf(line_2, "TR: %.2f", parameters->TR);
+        showLines(line_1, line_2);
+
+        run_show = 0;
+    }
+    pthread_mutex_unlock(&mutex_show);
+    return NULL;
+}
+
+void sig_handler(int signum){
+	n_executions++;
+
+    // start bme
+    pthread_mutex_lock(&mutex_bme);
+    if(run_bme == 0){
+        run_bme = 1;
+        pthread_cond_signal(&condition_bme);
+    }
+    pthread_mutex_unlock(&mutex_bme);
+
+    // start uart
+    pthread_mutex_lock(&mutex_uart);
+    if(run_uart == 0){
+        run_uart = 1;
+        pthread_cond_signal(&condition_uart);
+    }
+    pthread_mutex_unlock(&mutex_uart);
+
+    // start control
+    pthread_mutex_lock(&mutex_control);
+    if(run_control == 0){
+        run_control = 1;
+        pthread_cond_signal(&condition_control);
+    }
+    pthread_mutex_unlock(&mutex_control);
+
+    // start show
+    pthread_mutex_lock(&mutex_show);
+    if(run_show == 0){
+        run_show = 1;
+        pthread_cond_signal(&condition_show);
+    }
+    pthread_mutex_unlock(&mutex_show);
+
+    // every 2 seconds
+    if(n_executions == 4){
+        n_executions = 0;
+        // start csv
+        pthread_mutex_lock(&mutex_csv);
+        if(run_csv == 0){
+            run_csv = 1;
+            pthread_cond_signal(&condition_csv);
+        }
+        pthread_mutex_unlock(&mutex_csv);
+    }
+    ualarm(5e5, 5e5);
+}
+
+void exit_program(int signal){
+    execute = 0;
+};
 
 int main(int argc, char ** argv){
-    int histerese = 4;
-    float external_temperature;
-    float reference_temperature;
-    float internal_temperature;
-    struct bme280_dev * sensor_bme280 = create_sensor("/dev/i2c-1");
+	build_csv();
+    temperatures.sensor_bme280 = create_sensor("/dev/i2c-1");
 
     if (wiringPiSetup () == -1) exit (1);
 
     fd = wiringPiI2CSetup(I2C_ADDR);
 
     lcd_init(); // setup LCD
+    ClrLcd();
 
     if (!bcm2835_init())
         return 1;
+
 
     // Set the pin to be an output
     bcm2835_gpio_fsel(PIN_COOLER, BCM2835_GPIO_FSEL_OUTP);
     bcm2835_gpio_fsel(PIN_RESISTOR, BCM2835_GPIO_FSEL_OUTP);
 
-    bcm2835_gpio_write(PIN_COOLER, HIGH);
-    bcm2835_gpio_write(PIN_RESISTOR, LOW);
+    bcm2835_gpio_write(PIN_COOLER, LOW);
+    bcm2835_gpio_write(PIN_RESISTOR, HIGH);
 
-    signal(SIGINT, &trap);
-    execute = 1;
-    while(execute){
-        internal_temperature = get_temperature("TI");
-        reference_temperature = get_temperature("TR");
-        external_temperature = get_external_temperature(sensor_bme280);
-        printf("\n");
-        printf("Temperatura Externa: %.2f °C\n", external_temperature);
-        printf("Temperatura De Referência: %.2f °C\n", reference_temperature);
-        printf("Temperatura Interna: %.2f °C\n", internal_temperature);
-        printf("\n");
+    signal(SIGALRM, sig_handler);
+    signal(SIGINT, &exit_program);
 
-        char *line_1 = malloc(16*sizeof(char));
-        char *line_2 = malloc(16*sizeof(char));
-        sprintf(line_1, "TI: %.2f TE: %.1f", internal_temperature, external_temperature);
-        sprintf(line_2, "TR: %.2f", reference_temperature);
+    ualarm(5e5, 5e5);
 
-        showLines(line_1, line_2);
+    pthread_mutex_init(&mutex_bme, NULL);
+    pthread_mutex_init(&mutex_uart, NULL);
+    pthread_mutex_init(&mutex_control, NULL);
+    pthread_mutex_init(&mutex_show, NULL);
+    pthread_mutex_init(&mutex_csv, NULL);
+    pthread_cond_init(&condition_bme, NULL);
+    pthread_cond_init(&condition_uart, NULL);
+    pthread_cond_init(&condition_control, NULL);
+    pthread_cond_init(&condition_show, NULL);
+    pthread_cond_init(&condition_csv, NULL);
 
-        control(histerese, internal_temperature, reference_temperature);
-    }
+    pthread_t thread_id[5];
+    pthread_create(&thread_id[0], NULL, read_bme, (void *)&temperatures);
+    pthread_create(&thread_id[1], NULL, read_uart, (void *)&temperatures);
+    pthread_create(&thread_id[2], NULL, control_temperature, (void *)&temperatures);
+    pthread_create(&thread_id[3], NULL, show_information, (void *)&temperatures);
+    pthread_create(&thread_id[4], NULL, write_csv_file, (void *)&temperatures);
+
+    while(execute){sleep(1);}
+
+    run_bme = 1;
+    run_uart = 1;
+    run_control = 1;
+    run_show = 1;
+    run_csv = 1;
+    n_executions = 1;
 
     bcm2835_gpio_write(PIN_COOLER, HIGH);
     bcm2835_gpio_write(PIN_RESISTOR, HIGH);
     bcm2835_close();
+    fclose(csv_file);
 
+    pthread_join(&thread_id[0], NULL);
+    pthread_join(&thread_id[1], NULL);
+    pthread_join(&thread_id[2], NULL);
+    pthread_join(&thread_id[3], NULL);
+    pthread_join(&thread_id[4], NULL);
+
+    pthread_exit(NULL);
     return 0;
 }
