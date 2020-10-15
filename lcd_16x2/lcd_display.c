@@ -2,7 +2,6 @@
 
 
 void showLines(char *line_1, char *line_2){
-    ClrLcd();
     lcdLoc(LINE1);
     typeln(line_1);
     lcdLoc(LINE2);

@@ -56,7 +56,7 @@ float get_temperature(const char *temperature_name) { // temperature_name = TI |
         }
     }
 
-    usleep(1e5);
+    usleep(9e4);
 
     //----- CHECK FOR ANY RX BYTES -----
     if (uart0_filestream != -1) {
