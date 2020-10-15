@@ -15,6 +15,7 @@ struct measurements {
     float TE;
     float TI;
     float TR;
+    int histerese;
 };
 
 struct measurements temperatures;
@@ -42,7 +43,7 @@ void *read_bme(void *measurement){
     while(!run_bme){
         pthread_cond_wait(&condition_bme, &mutex_bme);
         struct measurements * parameters = (struct measurements *)measurement;
-	parameters->TE = get_external_temperature(parameters->sensor_bme280);
+        parameters->TE = get_external_temperature(parameters->sensor_bme280);
         run_bme = 0;
     }
     pthread_mutex_unlock(&mutex_bme);
@@ -61,7 +62,7 @@ void *read_uart(void *measurement){
     return NULL;
 }
 
-void *control_unit(void *measurement){
+void *control_temperature(void *measurement){
     pthread_mutex_lock(&mutex_control);
     while(!run_control){
         pthread_cond_wait(&condition_control, &mutex_control);
@@ -91,11 +92,7 @@ void *show_information(void *measurement){
         pthread_cond_wait(&condition_show, &mutex_show); //wait for the condition
 
         struct measurements * parameters = (struct measurements *)measurement;
-        printf("\n");
-        printf("Temperatura Externa: %.2f °C\n", parameters->TE);
-        printf("Temperatura De Referência: %.2f °C\n", parameters->TR);
-        printf("Temperatura Interna: %.2f °C\n", parameters->TI);
-        printf("\n");
+        printf("TE: %.2f°C, TI: %.2f°C, TR: %.2f°C\n", parameters->TE, parameters-TI, parameters->TR);
         char *line_1 = malloc(16*sizeof(char));
         char *line_2 = malloc(16*sizeof(char));
         sprintf(line_1, "TI: %.2fTE:%.1f", parameters->TI, parameters->TE);
@@ -110,6 +107,7 @@ void *show_information(void *measurement){
 
 void sig_handler(int signum){
 	n_executions++;
+
     // start bme
     pthread_mutex_lock(&mutex_bme);
     if(run_bme == 0){
@@ -142,21 +140,22 @@ void sig_handler(int signum){
     }
     pthread_mutex_unlock(&mutex_show);
 
+    // every 2 seconds
     if(n_executions == 4){
-	    n_executions = 0;
-    // start csv
-    pthread_mutex_lock(&mutex_csv);
-    if(run_csv == 0){
-        run_csv = 1;
-        pthread_cond_signal(&condition_csv);
-    }
-    pthread_mutex_unlock(&mutex_csv);
+        n_executions = 0;
+        // start csv
+        pthread_mutex_lock(&mutex_csv);
+        if(run_csv == 0){
+            run_csv = 1;
+            pthread_cond_signal(&condition_csv);
+        }
+        pthread_mutex_unlock(&mutex_csv);
     }
     ualarm(5e5, 5e5);
 }
 
 void exit_program(int signal){
-execute = 0;
+    execute = 0;
 };
 
 int main(int argc, char ** argv){
@@ -200,11 +199,18 @@ int main(int argc, char ** argv){
     pthread_t thread_id[5];
     pthread_create(&thread_id[0], NULL, read_bme, (void *)&temperatures);
     pthread_create(&thread_id[1], NULL, read_uart, (void *)&temperatures);
-    pthread_create(&thread_id[2], NULL, control_unit, (void *)&temperatures);
+    pthread_create(&thread_id[2], NULL, control_temperature, (void *)&temperatures);
     pthread_create(&thread_id[3], NULL, show_information, (void *)&temperatures);
     pthread_create(&thread_id[4], NULL, write_csv_file, (void *)&temperatures);
 
     while(execute){sleep(1);}
+
+    run_bme = 1;
+    run_uart = 1;
+    run_control = 1;
+    run_show = 1;
+    run_csv = 1;
+    n_executions = 1;
 
     bcm2835_gpio_write(PIN_COOLER, HIGH);
     bcm2835_gpio_write(PIN_RESISTOR, HIGH);
