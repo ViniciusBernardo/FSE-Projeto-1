@@ -183,13 +183,6 @@ int main(int argc, char ** argv){
 
     while(execute){sleep(1);}
 
-    run_bme = 1;
-    run_uart = 1;
-    run_control = 1;
-    run_show = 1;
-    run_csv = 1;
-    n_executions = 1;
-
     close_gpio();
     fclose(csv_file);
 
