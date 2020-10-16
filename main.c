@@ -83,11 +83,11 @@ void *show_information(void *measurement){
         pthread_cond_wait(&condition_show, &mutex_show); //wait for the condition
 
         struct measurements * parameters = (struct measurements *)measurement;
-        printf("TE: %.2f°C, TI: %.2f°C, TR: %.2f°C\n", parameters->TE, parameters-TI, parameters->TR);
+        printf("TE: %.2f°C, TI: %.2f°C, TR: %.2f°C\n", parameters->TE, parameters->TI, parameters->TR);
         char *line_1 = malloc(16*sizeof(char));
         char *line_2 = malloc(16*sizeof(char));
-        sprintf(line_1, "TI: %.2fTE:%.1f", parameters->TI, parameters->TE);
-        sprintf(line_2, "TR: %.2f", parameters->TR);
+        sprintf(line_1, "TI:%.2f TE:%.1f", parameters->TI, parameters->TE);
+        sprintf(line_2, "TR:%.2f", parameters->TR);
         showLines(line_1, line_2);
 
         run_show = 0;

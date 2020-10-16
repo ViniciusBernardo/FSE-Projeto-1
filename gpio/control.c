@@ -24,7 +24,7 @@ void control(int histerese, float TI, float TR) {
 
 void initialize_gpio(){
     if (!bcm2835_init())
-        return 1;
+        return;
 
     bcm2835_gpio_fsel(PIN_COOLER, BCM2835_GPIO_FSEL_OUTP);
     bcm2835_gpio_fsel(PIN_RESISTOR, BCM2835_GPIO_FSEL_OUTP);

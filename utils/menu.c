@@ -27,7 +27,7 @@ void initialize_menu(struct measurements * input){
 	while(status!=1){
 		while((temp=getchar()) != EOF && temp != '\n');
 		printf("Entrada inválida... Por favor entre com um número: ");
-		status = scanf("%d", &TR);
+		status = scanf("%f", &TR);
 	}
 
     input->TR = TR;
