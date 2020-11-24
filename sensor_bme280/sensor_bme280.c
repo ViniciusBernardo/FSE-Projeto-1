@@ -181,6 +181,7 @@ float get_external_temperature(struct bme280_dev * device){
      *  and the oversampling configuration. */
     req_delay = bme280_cal_meas_delay(&device->settings);
 
+    usleep(1e5);
     /* Set the sensor to forced mode */
     rslt = bme280_set_sensor_mode(BME280_FORCED_MODE, device);
     if (rslt != BME280_OK){
@@ -189,7 +190,7 @@ float get_external_temperature(struct bme280_dev * device){
     }
 
     /* Wait for the measurement to complete and print data */
-    device->delay_us(8e4, device->intf_ptr);
+    device->delay_us(req_delay, device->intf_ptr);
     rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, device);
     if (rslt != BME280_OK){
         fprintf(stderr, "Failed to get sensor data (code %+d).\n", rslt);

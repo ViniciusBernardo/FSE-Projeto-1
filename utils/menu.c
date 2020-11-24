@@ -2,6 +2,7 @@
 
 struct measurements {
     struct bme280_dev * sensor_bme280;
+    int * uart_filestream;
     float TE;
     float TI;
     float TR;

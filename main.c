@@ -31,10 +31,22 @@ int execute = 1;
 
 void *read_bme(void *measurement){
     pthread_mutex_lock(&mutex_bme);
+    uint8_t first_run = 1;
+    float aux_temp = 15;
     while(!run_bme){
         pthread_cond_wait(&condition_bme, &mutex_bme);
         struct measurements * parameters = (struct measurements *)measurement;
-        parameters->TE = get_external_temperature(parameters->sensor_bme280);
+	aux_temp = get_external_temperature(parameters->sensor_bme280);
+	if(first_run){
+	    if(aux_temp > 0){
+                parameters->TE = aux_temp;
+	    }
+	    first_run = 0;
+	} else {
+	    if(aux_temp > 0 && (aux_temp < parameters->TE + 2 && aux_temp > parameters->TE - 2)){
+                parameters->TE = aux_temp;
+	    }
+	}
         run_bme = 0;
     }
     pthread_mutex_unlock(&mutex_bme);
@@ -45,8 +57,8 @@ void *read_uart(void *measurement){
     while(!run_uart){
         pthread_cond_wait(&condition_uart, &mutex_uart);
         struct measurements * parameters = (struct measurements *)measurement;
-        parameters->TI = get_temperature("TI");
-        parameters->TR = get_temperature("TR");
+        get_temperature(0xA1, parameters->uart_filestream, &parameters->TI, parameters->TE);
+        get_temperature(0xA2, parameters->uart_filestream, &parameters->TR, parameters->TE);
         run_uart = 0;
     }
     pthread_mutex_unlock(&mutex_uart);
@@ -152,6 +164,7 @@ void exit_program(int signal){
 int main(int argc, char ** argv){
     struct measurements temperatures;
     temperatures.sensor_bme280 = create_sensor("/dev/i2c-1");
+    temperatures.uart_filestream = initialize_uart();
 
 	build_csv();
     initialize_lcd();
@@ -184,6 +197,7 @@ int main(int argc, char ** argv){
     while(execute){sleep(1);}
 
     close_gpio();
+    close_uart(temperatures.uart_filestream);
     fclose(csv_file);
 
     pthread_join(&thread_id[0], NULL);

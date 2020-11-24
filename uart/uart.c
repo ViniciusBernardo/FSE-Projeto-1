@@ -8,72 +8,63 @@ struct uart_temperatures{
     float TR;
 };
 
-float get_temperature(const char *temperature_name) { // temperature_name = TI || TR
-    int uart0_filestream = -1;
-    float temperature = -40;
+int * initialize_uart(){
+    int * uart0_filestream = (int *)malloc(sizeof(int));
 
-    uart0_filestream = open("/dev/serial0", O_RDWR | O_NOCTTY | O_NDELAY);
-    if(uart0_filestream == -1) {
+    *uart0_filestream = open("/dev/serial0", O_RDWR | O_NOCTTY | O_NDELAY);
+    if(*uart0_filestream == -1) {
         printf("Erro - Porta serial não pode ser aberta. Confirme se não está sendo usada por outra aplicação.\n");
-        return temperature;
     }
 
     struct termios options;
-    tcgetattr(uart0_filestream, &options);
-    options.c_cflag = B115200 | CS8 | CLOCAL | CREAD;		//<Set baud rate
+    tcgetattr(*uart0_filestream, &options);
+    options.c_cflag = B9600 | CS8 | CLOCAL | CREAD;		//<Set baud rate
     options.c_iflag = IGNPAR;
     options.c_oflag = 0;
     options.c_lflag = 0;
-    tcflush(uart0_filestream, TCIFLUSH);
-    tcsetattr(uart0_filestream, TCSANOW, &options);
+    tcflush(*uart0_filestream, TCIFLUSH);
+    tcsetattr(*uart0_filestream, TCSANOW, &options);
+    return uart0_filestream;
+}
 
-    unsigned char tx_buffer[20];
-    unsigned char *p_tx_buffer;
+void get_temperature(unsigned char command, int * uart0_filestream, float * measurement, float TE) { // temperature_name = TI || TR
 
-    if(temperature_name == "TI") {
-        p_tx_buffer = &tx_buffer[0];
-        *p_tx_buffer++ = 0xA1;
-        *p_tx_buffer++ = 1;
-        *p_tx_buffer++ = 3;
-        *p_tx_buffer++ = 3;
-        *p_tx_buffer++ = 1;
-    } else if (temperature_name == "TR") {
-        p_tx_buffer = &tx_buffer[0];
-        *p_tx_buffer++ = 0xA2;
-        *p_tx_buffer++ = 1;
-        *p_tx_buffer++ = 3;
-        *p_tx_buffer++ = 3;
-        *p_tx_buffer++ = 1;
-    } else {
-        printf("Invalid temperature_name!! (%s)\n", temperature_name);
-        return temperature;
-    }
+    unsigned char tx_buffer[5] = {command, 1, 3, 3, 1};
 
-    if (uart0_filestream != -1) {
-        int count = write(uart0_filestream, &tx_buffer[0], (p_tx_buffer - &tx_buffer[0]));		//Filestream, bytes to write, number of bytes to write
+    if (*uart0_filestream != -1) {
+        int count = write(*uart0_filestream, tx_buffer, 5);
         if (count < 0){
             printf("UART TX error\n");
         }
     }
 
-    usleep(9e4);
+    usleep(2e5);
 
     //----- CHECK FOR ANY RX BYTES -----
-    if (uart0_filestream != -1) {
-        // Read up to 255 characters from the port if they are there
-        unsigned char rx_buffer[256];
-        int rx_length = read(uart0_filestream, (void*)rx_buffer, 255);		//Filestream, buffer to store in, number of bytes to read (max)
+    if (*uart0_filestream != -1) {
+        unsigned char rx_buffer[100];
+        int rx_length = read(*uart0_filestream, (void*)rx_buffer, 10);
         if (rx_length < 0) {
-            printf("Erro na leitura.\n");
+            //printf("Erro na leitura da UART.\n");
         } else if (rx_length == 0) {
             printf("Nenhum dado disponível.\n");
         } else {
             //Bytes received
-            rx_buffer[rx_length] = '\0';
-            temperature = (*(float*)rx_buffer);
+	    float dado = 0;
+            memcpy(&dado, &rx_buffer[0], 4);
+	    if(command == 0xA1){
+	        if(dado < *measurement + 5 && dado > *measurement - 5 || *measurement == 0){
+	            *measurement = dado;
+	        }
+	    } else if(command == 0xA2) {
+		if(dado >= TE || dado <= 75){
+	            *measurement = dado;
+		}
+	    }
         }
     }
+}
 
-    close(uart0_filestream);
-    return temperature;
+void close_uart(int * uart0_filestream) {
+    close(*uart0_filestream);
 }
